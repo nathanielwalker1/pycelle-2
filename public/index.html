@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pycelle - Auto-categorize your monthly spending</title>
+    <link href="https://fonts.cdnfonts.com/css/satoshi" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>pycelle</h1>
+        <p class="subtitle">Auto-categorize your monthly spending in seconds.</p>
+        
+        <div class="input-container">
+            <h2>Steps:</h2>
+            <ol>
+                <li>Sign into your online bank account.</li>
+                <li>Go to your monthly statement and find withdrawals.</li>
+                <li>Simply copy and paste all of your transactions here.</li>
+            </ol>
+            <textarea id="transactionInput" rows="10" placeholder="Paste your transactions here..."></textarea>
+            
+            <div class="categories-input">
+                <label for="categoriesInput">Custom categories (optional):</label>
+                <input type="text" id="categoriesInput" placeholder="e.g. Groceries, Rent, Utilities">
+            </div>
+            
+            <button id="submitBtn">Enter</button>
+            <button id="clearBtn">Clear</button>
+        </div>
+        
+        <div id="results" class="hidden">
+            <h2>Summary</h2>
+            <div id="totalSpent"></div>
+            
+            <h3>Categories</h3>
+            <div id="categoriesList"></div>
+            
+            <h3>Breakdown</h3>
+            <div id="chartContainer">
+                <canvas id="pieChart"></canvas>
+            </div>
+            
+            <h3>All transactions</h3>
+            <table id="transactionsTable">
+                <thead>
+                    <tr>
+                        <th>Transaction</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="loadingOverlay" class="hidden">
+        <div class="loader-container">
+            <div class="loader"></div>
+            <div id="loadingPercentage">0%</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

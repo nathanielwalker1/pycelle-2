@@ -18,44 +18,73 @@ const openai = new OpenAI({
 app.use(express.json());
 app.use(express.static('public'));
 
+// Add this helper function at the top of server.js
+function sanitizeTransactions(transactions) {
+    return transactions
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => line.replace(/\t+/g, ' '))  // Replace tabs with spaces
+        .map(line => line.replace(/\s+/g, ' '))  // Normalize spaces
+        .map(line => line.replace(/[^\x20-\x7E]/g, ''))  // Remove non-printable characters
+        .join('\n');
+}
+
 // Routes
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.post('/categorize', async (req, res) => {
-  try {
-    const { transactions, categories } = req.body;
-    
-    console.log('Received transactions:', transactions);
-    console.log('Received categories:', categories);
+    try {
+        const { transactions, categories } = req.body;
+        const sanitizedTransactions = sanitizeTransactions(transactions);
+        
+        // Create the prompt with sanitized data
+        const prompt = categories && categories.length > 0
+            ? `Please categorize these transactions into the following categories: ${categories.join(', ')}.\n\nTransactions:\n${sanitizedTransactions}`
+            : `Please categorize these transactions into appropriate spending categories.\n\nTransactions:\n${sanitizedTransactions}`;
 
-    // Prepare the prompt for OpenAI
-    const prompt = `Categorize the following transactions into ${categories.length > 0 ? 'these categories: ' + categories.join(', ') : 'appropriate categories'}. For any transaction that doesn't fit the specified categories, use "Other - [Category]". Format the response as a JSON object with categories as keys and arrays of transactions as values. Transactions:\n${transactions}`;
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a financial transaction categorizer. Analyze the transactions and return a JSON object where keys are categories and values are arrays of transactions. Format the response as a clean JSON object without any markdown or additional text. Example format: {"Category1": ["transaction1", "transaction2"], "Category2": ["transaction3"]}`
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ]
+        });
 
-    console.log('Sending prompt to OpenAI:', prompt);
+        // Log the raw response for debugging
+        console.log('Raw OpenAI response:', completion.choices[0].message.content);
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-0125-preview",
-      messages: [
-        { role: "system", content: "You are a helpful financial assistant that categorizes financial transactions from a user's bank statement. If the user does not specify categories, use the default, commonly used categories that you are trained on. This includes categories such as Groceries, Rent, Utilities, Transportation, Eating Out, etc. If you don't recognize a transaction, you can also lump it into 'Other - [Category]'. If the user does specify categories, use those categories, and for the ones it doesn't recognize, lump them into 'Other - [Category]'" },
-        { role: "user", content: prompt }
-      ],
-    });
+        try {
+            const jsonString = completion.choices[0].message.content
+                .trim()
+                .replace(/[\n\r]/g, '')
+                .replace(/\s+/g, ' ');
 
-    console.log('Received response from OpenAI:', completion.choices[0].message.content);
-
-    // Remove Markdown formatting if present
-    let jsonString = completion.choices[0].message.content.replace(/```json\n|\n```/g, '');
-
-    const categorizedTransactions = JSON.parse(jsonString);
-    res.json(categorizedTransactions);
-    
-    console.log('Sent response');
-  } catch (error) {
-    console.error('Detailed error:', error);
-    res.status(500).json({ error: 'An error occurred while processing your request.', details: error.message });
-  }
+            const categorizedTransactions = JSON.parse(jsonString);
+            res.json(categorizedTransactions);
+        } catch (parseError) {
+            console.error('JSON parsing error:', parseError);
+            res.status(500).json({
+                error: 'Failed to parse the AI response',
+                details: parseError.message,
+                rawResponse: completion.choices[0].message.content
+            });
+        }
+    } catch (error) {
+        console.error('Server error:', error);
+        res.status(500).json({
+            error: 'An error occurred while processing your request.',
+            details: error.message
+        });
+    }
 });
 
 // Start the server

@@ -60,7 +60,21 @@ document.addEventListener('DOMContentLoaded', () => {
             scrollToResults();
         } catch (error) {
             console.error('Detailed error:', error);
-            alert(`An error occurred: ${error.message}. Please check the console for more details.`);
+            let errorMessage = 'An unexpected error occurred.';
+            
+            try {
+                if (error.response) {
+                    const errorData = await error.response.json();
+                    errorMessage = `Server error: ${errorData.error}. Details: ${errorData.details}`;
+                    console.error('Raw AI response:', errorData.rawResponse);
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+            } catch (e) {
+                console.error('Error parsing error response:', e);
+            }
+            
+            alert(errorMessage);
         } finally {
             clearInterval(progressInterval);
             loadingOverlay.classList.remove('visible');

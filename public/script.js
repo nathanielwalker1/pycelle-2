@@ -109,7 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.entries(data).forEach(([category, transactions]) => {
             let categoryTotal = 0;
             transactions.forEach(transaction => {
-                const amountMatch = transaction.match(/\$(\d+(\.\d{2})?)/);
+                // Improved amount extraction logic
+                const amountMatch = transaction.match(/[$€£]?(\d+(?:\.\d{1,2})?)/);
                 if (amountMatch) {
                     const amount = parseFloat(amountMatch[1]);
                     if (!isNaN(amount)) {
@@ -129,22 +130,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sort categories by total amount spent (highest to lowest)
         const sortedCategories = Object.entries(categoryTotals)
-            .sort(([,a],[,b]) => b - a)
+            .sort(([, a], [, b]) => b - a)
             .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
 
         // Display sorted categories
         categoriesList.innerHTML = Object.entries(sortedCategories)
             .map(([category, categoryTotal]) => {
-                const percentage = ((categoryTotal / total) * 100).toFixed(2);
+                const percentage = total > 0 ? ((categoryTotal / total) * 100).toFixed(2) : 0; // Prevent division by zero
                 return `<p>${category}: $${categoryTotal.toFixed(2)} (${percentage}%)</p>`;
             })
             .join('');
 
-        // Create pie chart (use sortedCategories instead of data)
+        // Create pie chart
         const ctx = document.getElementById('pieChart').getContext('2d');
-        if (pieChart) {
-            pieChart.destroy();
-        }
+        const categories = Object.keys(sortedCategories);
+        const categoryValues = Object.values(sortedCategories);
 
         // Extended color palette
         const colorPalette = [
@@ -154,15 +154,18 @@ document.addEventListener('DOMContentLoaded', () => {
             '#58B19F', '#2C3A47', '#B33771', '#3B3B98', '#FD7272', '#9AECDB'
         ];
 
-        const categories = Object.keys(sortedCategories);
         const categoryColors = categories.map((_, index) => colorPalette[index % colorPalette.length]);
+
+        if (pieChart) {
+            pieChart.destroy(); // Destroy previous chart instance if it exists
+        }
 
         pieChart = new Chart(ctx, {
             type: 'pie',
             data: {
                 labels: categories,
                 datasets: [{
-                    data: Object.values(sortedCategories),
+                    data: categoryValues,
                     backgroundColor: categoryColors,
                 }]
             },
@@ -171,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'right',
+                        position: 'bottom',
                         labels: {
                             boxWidth: 12,
                             padding: 10
@@ -181,9 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         callbacks: {
                             label: function(context) {
                                 const label = context.label || '';
-                                const value = context.parsed || 0;
-                                const dataset = context.dataset;
-                                const total = dataset.data.reduce((acc, data) => acc + data, 0);
+                                const value = context.raw || 0;
                                 const percentage = ((value / total) * 100).toFixed(2);
                                 return `${label}: $${value.toFixed(2)} (${percentage}%)`;
                             }
@@ -198,10 +199,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         Object.entries(data).forEach(([category, transactions]) => {
             transactions.forEach(transaction => {
-                const amountMatch = transaction.match(/\$(\d+(\.\d{2})?)/);
+                const amountMatch = transaction.match(/[$€£]?(\d+(?:\.\d{1,2})?)/);
                 const amount = amountMatch ? amountMatch[0] : 'N/A';
                 const description = transaction.replace(amount, '').trim();
-                
+
                 const row = transactionsTable.insertRow();
                 row.insertCell(0).textContent = description;
                 row.insertCell(1).textContent = category;

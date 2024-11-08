@@ -42,7 +42,7 @@ app.post('/categorize', async (req, res) => {
         
         // Create the prompt with sanitized data
         const prompt = categories && categories.length > 0
-            ? `Please categorize these transactions into the following categories: ${categories.join(', ')}.\n\nTransactions:\n${sanitizedTransactions}`
+            ? `Please categorize these transactions into the following categories: ${categories.join(', ')}. If any transaction doesn't clearly fit these categories, place it in an "Other" category.\n\nTransactions:\n${sanitizedTransactions}`
             : `Please categorize these transactions into appropriate spending categories.\n\nTransactions:\n${sanitizedTransactions}`;
 
         const completion = await openai.chat.completions.create({
@@ -50,7 +50,18 @@ app.post('/categorize', async (req, res) => {
             messages: [
                 {
                     role: "system",
-                    content: `You are a financial transaction categorizer. Analyze the transactions and return a JSON object where keys are categories and values are arrays of transactions. Format the response as a clean JSON object without any markdown or additional text. Example format: {"Category1": ["transaction1", "transaction2"], "Category2": ["transaction3"]}`
+                    content: `You are a financial transaction categorizer. Analyze the transactions and return a JSON object where keys are categories and values are arrays of transactions.
+                    Important: 
+                    1. The transaction amount is always preceded by a $ symbol (e.g. $99.99)
+                    2. ALL transactions must be categorized
+                    3. If a transaction doesn't clearly fit into the user-specified categories, place it in an "Other" category
+                    4. Never discard or ignore any transactions
+                    Format the response as a clean JSON object without any markdown or additional text. 
+                    Example format with Other category: {
+                        "Category1": ["transaction1 $20.00"],
+                        "Category2": ["transaction2 $15.50"],
+                        "Other": ["unmatched_transaction $45.00"]
+                    }`
                 },
                 {
                     role: "user",
